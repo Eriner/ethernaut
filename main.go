@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
@@ -23,8 +24,53 @@ var (
 
 func main() {
 	cmd := rootCommand()
+	cmd.AddCommand(
+		createWallet(),
+		mintBoobsWallet(),
+	)
 	if err := cmd.Execute(); err != nil {
 		log.Fatalln(err)
+	}
+}
+
+func mintBoobsWallet() *cobra.Command {
+	return &cobra.Command{
+		Use: "boobs",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			var attempts int
+			const desiredPrefix string = "0x80085"
+			fmt.Println("oh, he's tryyyin!")
+			for {
+				attempts++
+				ks := keystore.NewKeyStore("./wallets", keystore.StandardScryptN, keystore.StandardScryptP)
+				account, err := ks.NewAccount(password)
+				if err != nil {
+					log.Fatalln("unable to create wallet: %w", err)
+				}
+				// log.Println("successfully created wallet:" + account.Address.Hex())
+				if strings.HasPrefix(account.Address.Hex(), desiredPrefix) {
+					fmt.Println()
+					log.Printf("found our address: %q after %d attempts\n", account.Address.Hex(), attempts)
+					return nil
+				}
+				fmt.Printf(".")
+			}
+		},
+	}
+}
+
+func createWallet() *cobra.Command {
+	return &cobra.Command{
+		Use: "createWallet",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ks := keystore.NewKeyStore("./wallets", keystore.StandardScryptN, keystore.StandardScryptP)
+			account, err := ks.NewAccount(password)
+			if err != nil {
+				log.Fatalln("unable to create wallet: %w", err)
+			}
+			log.Println("successfully created wallet:" + account.Address.Hex())
+			return nil
+		},
 	}
 }
 
