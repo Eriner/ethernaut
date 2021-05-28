@@ -38,6 +38,7 @@ func mintBoobsWallet() *cobra.Command {
 	return &cobra.Command{
 		Use: "boobs",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			var attemptsMu sync.Mutex
 			var attempts int
 			const desiredPrefix string = "0x80085"
 			fmt.Println("oh, he's tryyyin!")
@@ -48,19 +49,31 @@ func mintBoobsWallet() *cobra.Command {
 				wg.Add(1)
 				go func() {
 					for {
-						attempts++
-						ks := keystore.NewKeyStore("./wallets", keystore.LightScryptN, keystore.LightScryptP)
-						account, err := ks.NewAccount(password)
-						if err != nil {
-							log.Fatalln("unable to create wallet: %w", err)
-						}
-						// log.Println("successfully created wallet:" + account.Address.Hex())
-						if strings.HasPrefix(account.Address.Hex(), desiredPrefix) {
-							fmt.Println()
-							log.Printf("found our address: %q after %d attempts\n", account.Address.Hex(), attempts)
-							os.Exit(0)
-						}
-						fmt.Printf(".")
+						var ks *keystore.KeyStore // re-use optimization
+						func() {                  // anonymous func to ensure that GC cleans the ks
+							attemptsMu.Lock()
+							attempts++
+							attemptsMu.Unlock()
+							tmpDir, err := ioutil.TempDir("", "")
+							if err != nil {
+								log.Fatalln("unable to create temporary directory:", err.Error())
+							}
+							ks = keystore.NewKeyStore(tmpDir, keystore.LightScryptN, keystore.LightScryptP)
+							account, err := ks.NewAccount(password)
+							if err != nil {
+								log.Fatalln("unable to create wallet: %w", err)
+							}
+							// log.Println("successfully created wallet:" + account.Address.Hex())
+							if strings.HasPrefix(account.Address.Hex(), desiredPrefix) {
+								fmt.Println()
+								log.Printf("found our address: %q after %d attempts\n", account.Address.Hex(), attempts)
+								log.Printf("wallet is located in %q\n", tmpDir)
+								os.Exit(0)
+							}
+							ks = nil // ensure old keystore and account is GC'd, otherwise there is a memory leak
+							_ = os.Remove(tmpDir)
+							fmt.Printf(".")
+						}()
 					}
 				}()
 			}
