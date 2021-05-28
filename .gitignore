@@ -1,0 +1,4 @@
+ethernaut
+*.swp
+*.log
+wallets/
