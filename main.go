@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
@@ -40,21 +41,31 @@ func mintBoobsWallet() *cobra.Command {
 			var attempts int
 			const desiredPrefix string = "0x80085"
 			fmt.Println("oh, he's tryyyin!")
-			for {
-				attempts++
-				ks := keystore.NewKeyStore("./wallets", keystore.StandardScryptN, keystore.StandardScryptP)
-				account, err := ks.NewAccount(password)
-				if err != nil {
-					log.Fatalln("unable to create wallet: %w", err)
-				}
-				// log.Println("successfully created wallet:" + account.Address.Hex())
-				if strings.HasPrefix(account.Address.Hex(), desiredPrefix) {
-					fmt.Println()
-					log.Printf("found our address: %q after %d attempts\n", account.Address.Hex(), attempts)
-					return nil
-				}
-				fmt.Printf(".")
+			const routines int = 6
+			var wg sync.WaitGroup
+
+			for i := 0; i <= routines; i++ {
+				wg.Add(1)
+				go func() {
+					for {
+						attempts++
+						ks := keystore.NewKeyStore("./wallets", keystore.LightScryptN, keystore.LightScryptP)
+						account, err := ks.NewAccount(password)
+						if err != nil {
+							log.Fatalln("unable to create wallet: %w", err)
+						}
+						// log.Println("successfully created wallet:" + account.Address.Hex())
+						if strings.HasPrefix(account.Address.Hex(), desiredPrefix) {
+							fmt.Println()
+							log.Printf("found our address: %q after %d attempts\n", account.Address.Hex(), attempts)
+							os.Exit(0)
+						}
+						fmt.Printf(".")
+					}
+				}()
 			}
+			wg.Wait() // this will never happen, but prevents termination.
+			return nil
 		},
 	}
 }
@@ -83,7 +94,7 @@ func rootCommand() *cobra.Command {
 			if !ok {
 				return fmt.Errorf(passwordEnvVar + "is unset")
 			}
-			if client != nil {
+			if client == nil {
 				var err error
 				client, err = ethclient.Dial("http://127.0.0.1:8545")
 				if err != nil {

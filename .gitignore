@@ -2,3 +2,4 @@ ethernaut
 *.swp
 *.log
 wallets/
+*.exe
