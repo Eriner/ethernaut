@@ -3,3 +3,4 @@ ethernaut
 *.log
 wallets/
 *.exe
+challenges/
